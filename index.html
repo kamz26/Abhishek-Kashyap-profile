@@ -776,9 +776,63 @@
     nav ul { display:none; }
     .av-sys { width:220px; height:220px; }
   }
+
+  /* ═══════════════════════════════════════════════
+     DOWNLOAD CV BUTTON
+  ═══════════════════════════════════════════════ */
+  .btn-cv {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 24px; border-radius: 100px;
+    border: 1px solid rgba(var(--cr),.4);
+    background: rgba(var(--cr),.07);
+    color: var(--cyan); font-weight: 600; font-size: .88rem;
+    text-decoration: none; cursor: none;
+    backdrop-filter: blur(8px);
+    transition: border-color .2s, background .2s, transform .2s, box-shadow .2s;
+  }
+  .btn-cv:hover {
+    border-color: rgba(var(--cr),.8);
+    background: rgba(var(--cr),.15);
+    box-shadow: 0 0 18px rgba(var(--cr),.25);
+  }
+  .btn-cv svg { flex-shrink:0; }
+
+  /* Hire-drop download CV row */
+  .hd-icon.cv { background: linear-gradient(135deg, #06b6d4, #0e87f5); }
+
+  /* CV download loading spinner overlay */
+  #cv-spinner {
+    display: none;
+    position: fixed; inset:0; z-index:99999;
+    background: rgba(3,5,8,0.72);
+    backdrop-filter: blur(10px);
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 1.2rem;
+  }
+  #cv-spinner.active { display:flex; }
+  .cv-spin-ring {
+    width: 52px; height: 52px; border-radius: 50%;
+    border: 3px solid rgba(var(--cr),.2);
+    border-top-color: var(--cyan);
+    animation: cvSpin .8s linear infinite;
+  }
+  @keyframes cvSpin { to{ transform:rotate(360deg); } }
+  .cv-spin-label {
+    font-family: 'Fira Code', monospace;
+    font-size: .78rem; color: var(--cyan); letter-spacing:1.5px;
+  }
   </style>
 </head>
 <body>
+
+<!-- html2pdf CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<!-- CV Download Spinner -->
+<div id="cv-spinner">
+  <div class="cv-spin-ring"></div>
+  <div class="cv-spin-label">generating cv.pdf …</div>
+</div>
 
 <!-- ════════════════════════════════
      TERMINAL INTRO
@@ -809,7 +863,7 @@
      NAV
 ════════════════════════════════ -->
 <nav>
-  <div class="nav-logo">AK.</div>
+  <div class="nav-logo">Abhishek Kashyap</div>
   <ul>
     <li><a href="#experience">Experience</a></li>
     <li><a href="#skills">Skills</a></li>
@@ -840,6 +894,17 @@
           <div>
             <div class="hd-label">Send an Email</div>
             <div class="hd-sub">kashyapabhishek26@yahoo.com</div>
+          </div>
+        </button>
+        <div class="hd-divider"></div>
+        <!-- Download CV -->
+        <button class="hd-opt" id="hdDownloadCV">
+          <div class="hd-icon cv">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+          <div>
+            <div class="hd-label">Download CV</div>
+            <div class="hd-sub">abhishek-kashyap-cv.pdf</div>
           </div>
         </button>
       </div>
@@ -874,6 +939,10 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
             Email
           </a>
+          <button class="btn-cv" id="btnDownloadCV">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download CV
+          </button>
         </div>
         <div class="hero-stats">
           <div><div class="snum" data-c="10" data-s="+">0</div><div class="slbl">Years XP</div></div>
@@ -1691,6 +1760,92 @@ document.getElementById('hdEmail').addEventListener('click', () => {
     .then(() => showToast('📋 Email copied to clipboard!'))
     .catch(() => showToast('✉️ ' + email));
   setTimeout(() => { window.location.href = 'mailto:' + email; }, 700);
+});
+
+/* ────────────────────────────────
+   DOWNLOAD CV — html2pdf
+──────────────────────────────── */
+function triggerCVDownload() {
+  const spinner = document.getElementById('cv-spinner');
+  spinner.classList.add('active');
+
+  // Elements to include in the CV PDF
+  const cvContent = document.createElement('div');
+  cvContent.style.cssText = 'font-family:Arial,sans-serif;color:#0f172a;background:#fff;padding:0;';
+
+  // Grab key sections: hero text, experience, skills, projects, education, contact
+  const sections = ['hero','experience','skills','projects','education','contact'];
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      const clone = el.cloneNode(true);
+      // Remove canvas / animated decorations inside clones
+      clone.querySelectorAll('canvas,.av-glow,.av-ring,.av-hud,.hc,#particle-canvas,#sparkle-canvas').forEach(n => n.remove());
+      cvContent.appendChild(clone);
+    }
+  });
+
+  const opt = {
+    margin:       [12, 14, 12, 14],
+    filename:     'abhishek-kashyap-cv.pdf',
+    image:        { type: 'jpeg', quality: 0.97 },
+    html2canvas:  {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      windowWidth: 900
+    },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+
+  // Use the live page body but hide interactive overlays
+  const body = document.body;
+
+  // Temporarily set print-friendly styles on body
+  const prevCursor = body.style.cursor;
+  body.style.cursor = 'auto';
+  document.getElementById('intro').style.display = 'none';
+  document.getElementById('cv-spinner').style.backdropFilter = 'none'; // don't capture spinner
+
+  html2pdf()
+    .set(opt)
+    .from(cvContent)
+    .save()
+    .then(() => {
+      spinner.classList.remove('active');
+      body.style.cursor = prevCursor;
+      document.getElementById('intro').style.display = '';
+      showToast('✅ CV downloaded successfully!');
+    })
+    .catch(() => {
+      spinner.classList.remove('active');
+      showToast('⚠️ Download failed — try again');
+    });
+}
+
+// Hero "Download CV" button
+document.getElementById('btnDownloadCV').addEventListener('click', () => {
+  triggerCVDownload();
+});
+
+// Hire-drop "Download CV" option
+document.getElementById('hdDownloadCV').addEventListener('click', () => {
+  hireDrop.classList.remove('open');
+  hireBtn.classList.remove('open');
+  triggerCVDownload();
+});
+
+// Also wire magnetic effect for the new btn-cv
+document.querySelectorAll('.btn-cv').forEach(btn=>{
+  btn.addEventListener('mousemove',e=>{
+    const r=btn.getBoundingClientRect();
+    const x=(e.clientX-r.left-r.width/2)*0.28;
+    const y=(e.clientY-r.top-r.height/2)*0.28;
+    btn.style.transform=`translate(${x}px,${y}px)`;
+  });
+  btn.addEventListener('mouseleave',()=>{ btn.style.transform=''; });
 });
 </script>
 </body>
